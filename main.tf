@@ -38,15 +38,15 @@ resource "aws_eks_cluster" "default" {
     endpoint_private_access = var.endpoint_private_access
     endpoint_public_access  = var.endpoint_public_access
     public_access_cidrs     = var.public_access_cidrs
-    security_group_ids      = var.eks_additional_security_group_ids
+    security_group_ids      = concat(var.eks_additional_security_group_ids, var.vpc_security_group_ids)
   }
 
   dynamic "encryption_config" {
     for_each = var.cluster_encryption_config_enabled ? [local.cluster_encryption_config] : []
     content {
-      resources = lookup(encryption_config.value, "resources")
+      resources = lookup(encryption_config.value, "resources", null)
       provider {
-        key_arn = lookup(encryption_config.value, "provider_key_arn")
+        key_arn = lookup(encryption_config.value, "provider_key_arn", null)
       }
     }
   }
@@ -91,15 +91,15 @@ resource "aws_eks_cluster" "default" {
 
 data "tls_certificate" "cluster" {
   count = var.enabled && var.oidc_provider_enabled ? 1 : 0
-  url   = aws_eks_cluster.default[0].identity.0.oidc.0.issuer
+  url   = aws_eks_cluster.default[0].identity[0].oidc[0].issuer
 }
 
 resource "aws_iam_openid_connect_provider" "default" {
   count = var.enabled && var.oidc_provider_enabled ? 1 : 0
-  url   = aws_eks_cluster.default[0].identity.0.oidc.0.issuer
+  url   = aws_eks_cluster.default[0].identity[0].oidc[0].issuer
 
   client_id_list  = distinct(compact(concat(["sts.${data.aws_partition.current.dns_suffix}"], var.openid_connect_audiences)))
-  thumbprint_list = [data.tls_certificate.cluster[0].certificates.0.sha1_fingerprint]
+  thumbprint_list = [data.tls_certificate.cluster[0].certificates[0].sha1_fingerprint]
   tags            = module.labels.tags
 }
 

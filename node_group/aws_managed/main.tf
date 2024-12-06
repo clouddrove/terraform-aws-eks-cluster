@@ -1,6 +1,3 @@
-data "aws_partition" "current" {}
-
-data "aws_caller_identity" "current" {}
 
 #Module      : label
 #Description : Terraform module to create consistent naming for multiple names.
@@ -25,22 +22,40 @@ module "labels" {
 
 
 resource "aws_launch_template" "this" {
-  count       = var.enabled ? 1 : 0
-  name        = module.labels.id
-  description = var.launch_template_description
-
-  ebs_optimized = var.ebs_optimized
-  image_id      = var.ami_id
-  # # Set on node group instead
-  # instance_type = var.launch_template_instance_type
-  key_name               = var.key_name
-  user_data              = var.before_cluster_joining_userdata
-  vpc_security_group_ids = var.vpc_security_group_ids
-
+  count                   = var.enabled ? 1 : 0
+  name                    = module.labels.id
+  description             = var.launch_template_description
+  ebs_optimized           = var.ebs_optimized
+  image_id                = var.ami_id
+  key_name                = var.key_name
+  user_data               = var.before_cluster_joining_userdata
+  vpc_security_group_ids  = var.vpc_security_group_ids
   disable_api_termination = var.disable_api_termination
   kernel_id               = var.kernel_id
   ram_disk_id             = var.ram_disk_id
+  default_version         = var.update_launch_template_default_version ? var.launch_template_default_version : null
 
+  dynamic "tag_specifications" {
+    for_each = var.launch_template_tags != null ? [var.launch_template_tags] : []
+    content {
+      resource_type = "instance"
+      tags          = tag_specifications.value
+    }
+  }
+
+  dynamic "instance_market_options" {
+    for_each = var.instance_market_options == true ? [{ market_type = "spot", spot_options = { max_price = "0.05" } }] : []
+    content {
+      market_type = instance_market_options.value.market_type
+
+      dynamic "spot_options" {
+        for_each = (instance_market_options.value.spot_options != null) ? [instance_market_options.value.spot_options] : []
+        content {
+          max_price = spot_options.value.max_price
+        }
+      }
+    }
+  }
   dynamic "block_device_mappings" {
     for_each = var.block_device_mappings
     content {
@@ -244,7 +259,7 @@ resource "aws_eks_node_group" "this" {
     for_each = var.taints
     content {
       key    = taint.value.key
-      value  = lookup(taint.value, "value")
+      value  = lookup(taint.value, "value", null)
       effect = taint.value.effect
     }
   }

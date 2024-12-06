@@ -1,3 +1,6 @@
+terraform {
+  required_version = ">= 1.5.4"
+}
 provider "aws" {
   region = local.region
 }
@@ -41,6 +44,7 @@ module "subnets" {
   ipv6_cidr_block     = module.vpc.ipv6_cidr_block
   type                = "public-private"
   igw_id              = module.vpc.igw_id
+  label_order         = local.label_order
 
   extra_public_tags = {
     "kubernetes.io/cluster/${module.eks.cluster_name}" = "shared"
@@ -228,6 +232,7 @@ module "eks" {
 
   name        = local.name
   environment = "test"
+  tags        = local.tags
 
   # EKS
   kubernetes_version      = "1.27"
@@ -237,7 +242,7 @@ module "eks" {
   vpc_id                            = module.vpc.vpc_id
   subnet_ids                        = module.subnets.private_subnet_id
   allowed_security_groups           = [module.ssh.security_group_id]
-  eks_additional_security_group_ids = ["${module.ssh.security_group_id}", "${module.http_https.security_group_id}"]
+  eks_additional_security_group_ids = [module.ssh.security_group_id, module.http_https.security_group_id]
   allowed_cidr_blocks               = [local.vpc_cidr_block]
 
   # Self Managed Node Grou
@@ -250,10 +255,8 @@ module "eks" {
       propagate_at_launch = true
       },
       {
-        key                 = "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/${module.eks.cluster_id}"
-        value               = "owned"
-        propagate_at_launch = true
-
+        key   = "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/${module.eks.cluster_id}"
+        value = "owned"
       }
     ]
 

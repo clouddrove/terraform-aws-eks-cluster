@@ -320,12 +320,6 @@ variable "managed_node_group" {
 
 #-----------------------------------------------ASG-Schedule----------------------------------------------------------------
 
-variable "create_schedule" {
-  description = "Determines whether to create autoscaling group schedule or not"
-  type        = bool
-  default     = true
-}
-
 variable "schedules" {
   description = "Map of autoscaling group schedule to create"
   type        = map(any)

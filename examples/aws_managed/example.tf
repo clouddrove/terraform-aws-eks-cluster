@@ -271,6 +271,7 @@ module "eks" {
   name        = local.name
   environment = local.environment
   label_order = local.label_order
+  tags        = local.tags
 
   # EKS
   kubernetes_version     = "1.27"
@@ -279,7 +280,7 @@ module "eks" {
   vpc_id                            = module.vpc.vpc_id
   subnet_ids                        = module.subnets.private_subnet_id
   allowed_security_groups           = [module.ssh.security_group_id]
-  eks_additional_security_group_ids = ["${module.ssh.security_group_id}", "${module.http_https.security_group_id}"]
+  eks_additional_security_group_ids = [module.ssh.security_group_id, module.http_https.security_group_id]
   allowed_cidr_blocks               = [local.vpc_cidr_block]
 
   # AWS Managed Node Group
@@ -290,7 +291,22 @@ module "eks" {
     tags = {
       "kubernetes.io/cluster/${module.eks.cluster_name}" = "shared"
       "k8s.io/cluster/${module.eks.cluster_name}"        = "shared"
+      propagate_tags = [{
+        key                 = "aws-node-termination-handler/managed"
+        value               = true
+        propagate_at_launch = true
+        },
+        {
+          key                 = "autoscaling:ResourceTag/k8s.io/cluster-autoscaler/${module.eks.cluster_id}"
+          value               = "owned"
+          propagate_at_launch = true
+      }]
     }
+    propagate_tags = [{
+      key                 = "aws-node-termination-handler/managed"
+      value               = true
+      propagate_at_launch = true
+    }]
     block_device_mappings = {
       xvda = {
         device_name = "/dev/xvda"
@@ -309,9 +325,9 @@ module "eks" {
     critical = {
       name           = "${module.eks.cluster_name}-critical"
       capacity_type  = "ON_DEMAND"
-      min_size       = 1
-      max_size       = 2
-      desired_size   = 2
+      min_size       = 0
+      max_size       = 1
+      desired_size   = 0
       instance_types = ["t3.medium"]
     }
 

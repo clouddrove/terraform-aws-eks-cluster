@@ -1,15 +1,11 @@
 locals {
   self_managed_node_group_default_tags = {
-    "Name"                                      = "${module.labels.id}"
-    "Environment"                               = "${var.environment}"
+    "Name"                                      = [module.labels.id]
+    "Environment"                               = [var.environment]
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
     "k8s.io/cluster/${var.cluster_name}"        = "owned"
   }
 }
-
-data "aws_partition" "current" {}
-
-data "aws_caller_identity" "current" {}
 
 
 #AMI AMAZON LINUX
@@ -34,7 +30,14 @@ data "template_file" "userdata" {
     certificate_authority_data = var.cluster_auth_base64
     cluster_name               = var.cluster_name
     bootstrap_extra_args       = var.bootstrap_extra_args
-
+    cluster_service_ipv4_cidr  = var.cluster_service_ipv4_cidr
+    pre_bootstrap_user_data    = var.pre_bootstrap_user_data
+    post_bootstrap_user_data   = var.post_bootstrap_user_data
+    delete_timeout             = var.delete_timeout
+    tags = flatten([for tag in var.propagate_tags : {
+      key   = tag["key"]
+      value = tag["value"]
+    }])
   }
 }
 #Module      : label
@@ -380,7 +383,7 @@ resource "aws_autoscaling_group" "this" {
     for_each = merge(local.self_managed_node_group_default_tags, var.tags)
     content {
       key                 = tag.key
-      value               = tag.value
+      value               = ""
       propagate_at_launch = true
     }
   }
